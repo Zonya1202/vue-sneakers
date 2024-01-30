@@ -1,15 +1,38 @@
 <script setup>
+import axios from 'axios'
+import { computed, inject, ref } from 'vue'
+
 import CartItemList from './CartItemList.vue'
 import DrawerHead from './DrawerHead.vue'
 import InfoBlock from './InfoBlock.vue'
 
-defineProps({
+const props = defineProps({
   totalPrice: Number,
-  vatPrice: Number,
-  disabledButton: Boolean
+  vatPrice: Number
 })
 
-const emit = defineEmits(['createOrder'])
+const { cart, closeDrawer } = inject('cart')
+
+const isCreating = ref(false)
+const orderId = ref(null)
+const createOrder = async () => {
+  try {
+    isCreating.value = true
+    const { data } = await axios.post(`https://2bc18652398696f3.mokky.dev/orders`, {
+      items: cart.value,
+      totalPrice: props.totalPrice.value
+    })
+    cart.value = []
+    orderId.value = data.id
+  } catch (err) {
+    console.log(err)
+  } finally {
+    isCreating.value = false
+  }
+}
+
+const isCartEmpty = computed(() => cart.value.length === 0)
+const disabledButton = computed(() => isCreating.value || isCartEmpty.value)
 </script>
 
 <template>
@@ -17,8 +40,19 @@ const emit = defineEmits(['createOrder'])
   <div class="bg-white w-96 h-full fixed right-0 top-0 z-20 p-8">
     <DrawerHead />
 
-    <div v-if="!totalPrice" class="flex h-full items-center">
-      <InfoBlock title="Ваша корзина" description="Добавьте товары" imageUrl="/package-icon.png" />
+    <div v-if="!totalPrice || orderId" class="flex h-full items-center">
+      <InfoBlock
+        v-if="!totalPrice && !orderId"
+        title="Ваша корзина"
+        description="Добавьте товары"
+        imageUrl="/package-icon.png"
+      />
+      <InfoBlock
+        v-if="orderId"
+        title="Заказ оформлен"
+        :description="`Ваш заказ №${orderId} скоро будет передан курьерской службе`"
+        imageUrl="/order-success-icon.png"
+      />
     </div>
 
     <div v-else>
@@ -37,7 +71,7 @@ const emit = defineEmits(['createOrder'])
           <b>{{ vatPrice }} р</b>
         </div>
         <button
-          @click="() => emit('createOrder')"
+          @click="createOrder"
           :disabled="disabledButton"
           class="mt-7 transition bg-lime-500 w-full rounded-xl py-3 text-white disabled:bg-slate-300 hover:bg-lime-600 active:bg-lime-700 cursor-pointer"
         >
